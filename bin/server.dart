@@ -11,16 +11,16 @@ Future<void> main() async {
   final routing = NotesRouting(conn, "notes");
 
   // GET /notes
-  router.get('/notes', routing.getAll);
+  router.get('/notes/', routing.getAll);
 
   // POST /notes
-  router.post('/notes', routing.create);
+  router.post('/notes/', routing.create);
 
   // PUT /notes/<id>
-  router.put('/notes/<id>', routing.update);
+  router.put('/notes/<id>/', routing.update);
 
   // DELETE /notes/<id>
-  router.delete('/notes/<id>', routing.delete);
+  router.delete('/notes/<id>/', routing.delete);
 
   final handler = const Pipeline()
       .addMiddleware(logRequests())
