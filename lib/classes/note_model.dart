@@ -1,5 +1,6 @@
 class Note {
   final int id;
+  final int? parentId;
   final String title;
   final String body;
   final DateTime createdAt;
@@ -7,6 +8,7 @@ class Note {
 
   Note({
     required this.id,
+    this.parentId,
     required this.title,
     required this.body,
     required this.createdAt,
@@ -16,6 +18,7 @@ class Note {
   factory Note.fromMap(Map<String, dynamic> map) {
     return Note(
       id: map['id'],
+      parentId: map['parent_id'],
       title: map['title'],
       body: map['body'],
       createdAt: DateTime.parse(map['created_at']),
@@ -26,6 +29,7 @@ class Note {
   factory Note.fromSql(Map<String, dynamic> map) {
     return Note(
       id: map['id'],
+      parentId: map['parent_id'],
       title: map['title'],
       body: map['body'],
       createdAt: map['created_at'],
@@ -36,6 +40,7 @@ class Note {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'parent_id': parentId,
       'title': title,
       'body': body,
       'created_at': createdAt.toIso8601String(),
