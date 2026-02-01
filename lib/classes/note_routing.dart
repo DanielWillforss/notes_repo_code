@@ -4,12 +4,36 @@ import 'package:notes_repo_core/util/exceptions.dart';
 import 'package:notes_repo_core/classes/note_repository.dart';
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
+import 'package:shelf_router/shelf_router.dart';
 
 class NotesRouting {
   late NoteRepository notesRepo;
 
   NotesRouting(Connection conn, String tablePath) {
     notesRepo = NoteRepository(conn, tablePath);
+  }
+
+  void register(Router router) {
+    // GET /notes
+    router.get('/notes/', getAll);
+
+    // POST /notes
+    router.post('/notes/', create);
+
+    // PUT /notes/<id>
+    //router.put('/notes/<id>/', update);
+
+    // PUT /notes/<id>
+    router.put('/notes/<id>/title/', updateTitle);
+
+    // PUT /notes/<id>
+    router.put('/notes/<id>/body/', updateContent);
+
+    // PUT /notes/<id>
+    router.put('/notes/<id>/parent/', updateParentId);
+
+    // DELETE /notes/<id>
+    router.delete('/notes/<id>/', delete);
   }
 
   Response _jsonResponse(Object body) {
@@ -90,16 +114,14 @@ class NotesRouting {
   /// returns created note as json
   /// returns badRequest('Request not formatted correctly') if req could not be parsed or contained other keys than title and body
   Future<Response> create(Request req) async {
-    final payload = await _decodeRequest(req, allowedKeys: {'title', 'body'});
+    final payload = await _decodeRequest(req, allowedKeys: {'title'});
     if (payload == null) {
       return Response.badRequest(body: 'Request not formatted correctly');
     }
 
-    final note = await notesRepo.insert(
-      title: payload['title'],
-      body: payload['body'],
-    );
-    return _jsonResponse(note.toJson());
+    await notesRepo.insert(title: payload['title']);
+    final notes = await notesRepo.findAll();
+    return _jsonResponse(notes.map((n) => n.toJson()).toList());
   }
 
   /// returns the updated note as json
@@ -107,7 +129,51 @@ class NotesRouting {
   /// returns jsonResponse({'status': 'null_update'}) if neither title nor body was given
   /// returns jsonResponse({'status': 'not_found'}) if the id was not found
   /// returns badRequest('Request not formatted correctly') if req could not be parsed or contained other keys than title and body
-  Future<Response> update(Request req, String id) async {
+  // Future<Response> update(Request req, String id) async {
+  //   final parsedId = _parseId(id);
+  //   if (!parsedId.isOk) return parsedId.error!;
+
+  //   final payload = await _decodeRequest(req, allowedKeys: {'title', 'body'});
+  //   if (payload == null) {
+  //     return Response.badRequest(body: 'Request not formatted correctly');
+  //   }
+
+  //   try {
+  //     await notesRepo.update(
+  //       id: parsedId.value!,
+  //       title: payload['title'],
+  //       body: payload['body'],
+  //     );
+  //     final notes = await notesRepo.findAll();
+  //     return _jsonResponse(notes.map((n) => n.toJson()).toList());
+  //   } on IdNotFoundException {
+  //     return _jsonResponse({'status': 'not_found'});
+  //   } on NullUpdateException {
+  //     return _jsonResponse({'status': 'null_update'});
+  //   }
+  // }
+
+  Future<Response> updateTitle(Request req, String id) async {
+    final parsedId = _parseId(id);
+    if (!parsedId.isOk) return parsedId.error!;
+
+    final payload = await _decodeRequest(req, allowedKeys: {'title'});
+    if (payload == null) {
+      return Response.badRequest(body: 'Request not formatted correctly');
+    }
+
+    try {
+      await notesRepo.updateTitle(id: parsedId.value!, title: payload['title']);
+      final notes = await notesRepo.findAll();
+      return _jsonResponse(notes.map((n) => n.toJson()).toList());
+    } on IdNotFoundException {
+      return _jsonResponse({'status': 'not_found'});
+    } on NullUpdateException {
+      return _jsonResponse({'status': 'null_update'});
+    }
+  }
+
+  Future<Response> updateContent(Request req, String id) async {
     final parsedId = _parseId(id);
     if (!parsedId.isOk) return parsedId.error!;
 
@@ -117,12 +183,32 @@ class NotesRouting {
     }
 
     try {
-      final note = await notesRepo.update(
+      await notesRepo.updateBody(id: parsedId.value!, body: payload['body']);
+      final notes = await notesRepo.findAll();
+      return _jsonResponse(notes.map((n) => n.toJson()).toList());
+    } on IdNotFoundException {
+      return _jsonResponse({'status': 'not_found'});
+    } on NullUpdateException {
+      return _jsonResponse({'status': 'null_update'});
+    }
+  }
+
+  Future<Response> updateParentId(Request req, String id) async {
+    final parsedId = _parseId(id);
+    if (!parsedId.isOk) return parsedId.error!;
+
+    final payload = await _decodeRequest(req, allowedKeys: {'parentId'});
+    if (payload == null) {
+      return Response.badRequest(body: 'Request not formatted correctly');
+    }
+
+    try {
+      await notesRepo.updateParent(
         id: parsedId.value!,
-        title: payload['title'],
-        body: payload['body'],
+        parentId: payload['parentId'],
       );
-      return _jsonResponse(note.toJson());
+      final notes = await notesRepo.findAll();
+      return _jsonResponse(notes.map((n) => n.toJson()).toList());
     } on IdNotFoundException {
       return _jsonResponse({'status': 'not_found'});
     } on NullUpdateException {
@@ -139,7 +225,8 @@ class NotesRouting {
 
     try {
       await notesRepo.delete(parsedId.value!);
-      return _jsonResponse({'status': 'deleted'});
+      final notes = await notesRepo.findAll();
+      return _jsonResponse(notes.map((n) => n.toJson()).toList());
     } on IdNotFoundException {
       return _jsonResponse({'status': 'not_found'});
     }

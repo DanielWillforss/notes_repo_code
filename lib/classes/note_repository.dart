@@ -91,6 +91,60 @@ class NoteRepository {
     return Note.fromSql(result.first.toColumnMap());
   }
 
+  Future<Note> updateTitle({required int id, required String title}) async {
+    final result = await conn.execute(
+      Sql.named('''
+      UPDATE $tablePath
+      SET title = @title, 'updated_at = clock_timestamp()'
+      WHERE id = @id
+      RETURNING *
+    '''),
+      parameters: {'title': title},
+    );
+
+    if (result.isEmpty) {
+      throw IdNotFoundException(id);
+    }
+
+    return Note.fromSql(result.first.toColumnMap());
+  }
+
+  Future<Note> updateBody({required int id, required String body}) async {
+    final result = await conn.execute(
+      Sql.named('''
+      UPDATE $tablePath
+      SET body = @body, 'updated_at = clock_timestamp()'
+      WHERE id = @id
+      RETURNING *
+    '''),
+      parameters: {'body': body},
+    );
+
+    if (result.isEmpty) {
+      throw IdNotFoundException(id);
+    }
+
+    return Note.fromSql(result.first.toColumnMap());
+  }
+
+  Future<Note> updateParent({required int id, int? parentId}) async {
+    final result = await conn.execute(
+      Sql.named('''
+      UPDATE $tablePath
+      SET parent_id = @parentId, 'updated_at = clock_timestamp()'
+      WHERE id = @id
+      RETURNING *
+    '''),
+      parameters: {'parentId': parentId},
+    );
+
+    if (result.isEmpty) {
+      throw IdNotFoundException(id);
+    }
+
+    return Note.fromSql(result.first.toColumnMap());
+  }
+
   // Delete a note
   // throws IdNotFoundException for non-existant id
   Future<void> delete(int id) async {

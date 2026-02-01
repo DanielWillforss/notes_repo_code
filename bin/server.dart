@@ -10,17 +10,7 @@ Future<void> main() async {
   final router = Router();
   final routing = NotesRouting(conn, "notes");
 
-  // GET /notes
-  router.get('/notes/', routing.getAll);
-
-  // POST /notes
-  router.post('/notes/', routing.create);
-
-  // PUT /notes/<id>
-  router.put('/notes/<id>/', routing.update);
-
-  // DELETE /notes/<id>
-  router.delete('/notes/<id>/', routing.delete);
+  routing.register(router);
 
   final handler = const Pipeline()
       .addMiddleware(logRequests())
