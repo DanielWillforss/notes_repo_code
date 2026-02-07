@@ -14,19 +14,17 @@ class NoteRepository {
       Sql.named('SELECT * FROM $tablePath ORDER BY created_at DESC'),
     );
 
-    return result.map((row) => Note.fromSql(row.toColumnMap())).toList();
+    return [for (final row in result) Note.fromMap(row.toColumnMap())];
   }
 
   // returns Note by id
   // throws IdNotFoundException for non-existant id
   Future<Note> findById(int id) async {
-    final result = await conn.execute(
-      Sql.named('SELECT * FROM $tablePath WHERE id = @id'),
-      parameters: {'id': id},
+    return _oneOrThrow(
+      'SELECT * FROM $tablePath WHERE id = @id',
+      params: {'id': id},
+      idForError: id,
     );
-
-    if (result.isEmpty) throw IdNotFoundException(id);
-    return Note.fromSql(result.first.toColumnMap());
   }
 
   /// Adds new note
@@ -34,83 +32,23 @@ class NoteRepository {
   /// Sets parent_id to null
   /// Sets createdAt and updatedAt to now()
   /// Returns updated Note
-  Future<Note> insert({String? title, String? body}) async {
-    final result = await conn.execute(
-      Sql.named('''
-        INSERT INTO $tablePath (title, body)
-        VALUES (@title, @body)
-        RETURNING *
-        '''),
-      parameters: {'title': title ?? '', 'body': body ?? ''},
+  Future<Note> insert({String? title, String? body}) {
+    return _oneOrThrow(
+      '''
+    INSERT INTO $tablePath (title, body)
+    VALUES (@title, @body)
+    RETURNING *
+    ''',
+      params: {'title': title ?? '', 'body': body ?? ''},
     );
-
-    return Note.fromSql(result.first.toColumnMap());
   }
-
-  /// Update title and/or content of a note
-  /// Sets updatedAt to clock_timestamp()
-  /// throws IdNotFoundException for non-existant id
-  /// throws NullUpdateExeption if nothing is updated
-  /// Returns updated Note
-  // Future<Note> update({required int id, String? title, String? body}) async {
-  //   // Collect fields to update
-  //   final fields = <String>[];
-  //   final parameters = <String, dynamic>{'id': id};
-
-  //   if (title != null) {
-  //     fields.add('title = @title');
-  //     parameters['title'] = title;
-  //   }
-
-  //   if (body != null) {
-  //     fields.add('body = @body');
-  //     parameters['body'] = body;
-  //   }
-
-  //   if (fields.isEmpty) {
-  //     throw NullUpdateException();
-  //   }
-
-  //   // Always update the timestamp
-  //   fields.add('updated_at = clock_timestamp()');
-
-  //   final sql =
-  //       '''
-  //     UPDATE $tablePath
-  //     SET ${fields.join(', ')}
-  //     WHERE id = @id
-  //     RETURNING *
-  //   ''';
-
-  //   final result = await conn.execute(Sql.named(sql), parameters: parameters);
-
-  //   if (result.isEmpty) {
-  //     throw IdNotFoundException(id);
-  //   }
-
-  //   return Note.fromSql(result.first.toColumnMap());
-  // }
 
   /// Update the title of a note
   /// Sets updatedAt to clock_timestamp()
   /// throws IdNotFoundException for non-existant id
   /// Returns updated Note
   Future<Note> updateTitle({required int id, required String title}) async {
-    final result = await conn.execute(
-      Sql.named('''
-      UPDATE $tablePath
-      SET title = @title, updated_at = clock_timestamp()
-      WHERE id = @id
-      RETURNING *
-    '''),
-      parameters: {'title': title, 'id': id},
-    );
-
-    if (result.isEmpty) {
-      throw IdNotFoundException(id);
-    }
-
-    return Note.fromSql(result.first.toColumnMap());
+    return _update(id, 'title = @title', {'title': title});
   }
 
   /// Update the body of a note
@@ -118,21 +56,7 @@ class NoteRepository {
   /// throws IdNotFoundException for non-existant id
   /// Returns updated Note
   Future<Note> updateBody({required int id, required String body}) async {
-    final result = await conn.execute(
-      Sql.named('''
-      UPDATE $tablePath
-      SET body = @body, updated_at = clock_timestamp()
-      WHERE id = @id
-      RETURNING *
-    '''),
-      parameters: {'body': body, 'id': id},
-    );
-
-    if (result.isEmpty) {
-      throw IdNotFoundException(id);
-    }
-
-    return Note.fromSql(result.first.toColumnMap());
+    return _update(id, 'body = @body', {'body': body});
   }
 
   /// Update the parent_id of a note
@@ -140,32 +64,43 @@ class NoteRepository {
   /// throws IdNotFoundException for non-existant id
   /// Returns updated Note
   Future<Note> updateParent({required int id, int? parentId}) async {
-    final result = await conn.execute(
-      Sql.named('''
-      UPDATE $tablePath
-      SET parent_id = @parentId, updated_at = clock_timestamp()
-      WHERE id = @id
-      RETURNING *
-    '''),
-      parameters: {'parentId': parentId, 'id': id},
-    );
-
-    if (result.isEmpty) {
-      throw IdNotFoundException(id);
-    }
-
-    return Note.fromSql(result.first.toColumnMap());
+    return _update(id, 'parent_id = @parentId', {'parentId': parentId});
   }
 
   // Delete a note
   // throws IdNotFoundException for non-existant id
   Future<void> delete(int id) async {
-    final result = await conn.execute(
-      Sql.named('DELETE FROM $tablePath WHERE id = @id'),
-      parameters: {'id': id},
+    await _oneOrThrow(
+      'DELETE FROM $tablePath WHERE id = @id RETURNING *',
+      params: {'id': id},
+      idForError: id,
     );
-    if (result.affectedRows == 0) {
-      throw IdNotFoundException(id);
+  }
+
+  Future<Note> _update(int id, String setClause, Map<String, Object?> params) {
+    return _oneOrThrow(
+      '''
+    UPDATE $tablePath
+    SET $setClause, updated_at = clock_timestamp()
+    WHERE id = @id
+    RETURNING *
+    ''',
+      params: {...params, 'id': id},
+      idForError: id,
+    );
+  }
+
+  Future<Note> _oneOrThrow(
+    String sql, {
+    required Map<String, Object?> params,
+    int? idForError,
+  }) async {
+    final result = await conn.execute(Sql.named(sql), parameters: params);
+
+    if (result.isEmpty && idForError != null) {
+      throw IdNotFoundException(idForError);
     }
+
+    return Note.fromMap(result.first.toColumnMap());
   }
 }

@@ -16,24 +16,19 @@ class Note {
   });
 
   factory Note.fromMap(Map<String, dynamic> map) {
-    return Note(
-      id: map['id'],
-      parentId: map['parent_id'],
-      title: map['title'],
-      body: map['body'],
-      createdAt: DateTime.parse(map['created_at']),
-      updatedAt: DateTime.parse(map['updated_at']),
-    );
-  }
+    DateTime parseDate(dynamic value) {
+      if (value is DateTime) return value; //From sql
+      if (value is String) return DateTime.parse(value); //From json
+      throw ArgumentError('Invalid date value: $value');
+    }
 
-  factory Note.fromSql(Map<String, dynamic> map) {
     return Note(
       id: map['id'],
       parentId: map['parent_id'],
       title: map['title'],
       body: map['body'],
-      createdAt: map['created_at'],
-      updatedAt: map['updated_at'],
+      createdAt: parseDate(map['created_at']),
+      updatedAt: parseDate(map['updated_at']),
     );
   }
 

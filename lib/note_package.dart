@@ -1,4 +1,4 @@
-library note_package;
+library;
 
 export 'classes/note_model.dart';
 export 'classes/note_repository.dart';
